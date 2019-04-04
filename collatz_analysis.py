@@ -1,54 +1,92 @@
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import sys
+# pd.set_option('display.max_columns', 999)
+# pd.set_option('display.max_rows', 999)
 
 """
-Converts a value to decimal
+Redirect Standard Output To Text File
 """
-def binary_value(decimal):
-    return "{0:08b}".format(decimal)
-
-"""
-Convert to binary and get first bit
-"""
-def get_first_bit(decimal):
-    value = "{0:08b}".format(decimal)
-    return value[0]
-
-"""
-Convert to binary and get last bit
-"""
-def get_last_bit(decimal):
-    value = "{0:08b}".format(decimal)
-    return value[-1]
-
-"""
-Read CSV into a dataframe
-"""
-df_collatz = pd.read_csv("collatz.csv")
+file = "master.txt"
+sys.stdout = open(file, 'wt')
 
 
 """
-Create new pd column with binary values for input and output i.e x0,x5
+Open CSV
 """
-df_collatz['binary_input'] = df_collatz['x0'].apply(binary_value)
-df_collatz['binary_output'] = df_collatz['x5'].apply(binary_value)
+csv_file = "master.csv"
+df = pd.read_csv(csv_file, delimiter=",")
 
 """
-Create new pd columns with first and last bits of x0 and x5
+Define Columns To Correlate
 """
-df_collatz['x0_first_bit'] = df_collatz['x0'].apply(get_first_bit)
-df_collatz['x0_last_bit'] = df_collatz['x0'].apply(get_last_bit)
-df_collatz['x5_first_bit'] = df_collatz['x5'].apply(get_first_bit)
-df_collatz['x5_last_bit'] = df_collatz['x5'].apply(get_last_bit)
+primary_prefix = "x0"
+secondary_prefix = "x5"
+all_prefix = "x"
+
+primary_columns = [col for col in df if col.startswith(primary_prefix)]
+secondary_columns = [col for col in df if col.startswith(secondary_prefix)]
+all_columns = [col for col in df if col.startswith(all_prefix)]
+columns = primary_columns + secondary_columns
+#columns = all_columns  # uncomment if we want all columns to be correlated
 
 """
-Print values
+Print Data Frame
 """
-print(df_collatz['x0_first_bit'].value_counts())
-print(df_collatz['x0_last_bit'].value_counts())
-print(df_collatz['x5_first_bit'].value_counts())
-print(df_collatz['x5_last_bit'].value_counts())
+print("Data Frame")
+print(df[columns])
+print()
 
 """
-Print Dataframe
+Print Correlation Matrix
 """
-print(df_collatz.to_string(index=False))
+print("Correlation Matrix")
+print(df[columns].corr())
+print()
+
+"""
+Get Redundant Pairs
+"""
+def get_redundant_pairs(df):
+    '''Get diagonal and lower triangular pairs of correlation matrix'''
+    pairs_to_drop = set()
+    cols = df.columns
+    for i in range(0, df.shape[1]):
+        for j in range(0, i+1):
+            pairs_to_drop.add((cols[i], cols[j]))
+    return pairs_to_drop
+
+def get_top_abs_correlations(df, n=5):
+    au_corr = df[columns].corr().abs().unstack()
+    labels_to_drop = get_redundant_pairs(df)
+    au_corr = au_corr.drop(labels=labels_to_drop).sort_values(ascending=False)
+    return au_corr[0:n]
+
+"""
+Get Top Absolute Correlations
+"""
+number_of_correlations = 10
+print("Top " + str(number_of_correlations) + " Absolute Correlations")
+print(get_top_abs_correlations(df[columns], number_of_correlations))
+
+
+"""
+Generate Seaborn Heatmap
+"""
+plt.figure(figsize=(15, 15))
+plt.title("Correlation Matrix of Bit's Between Iterations", size="24")
+corr = df[columns].corr()
+sns.heatmap(corr,
+            cmap="Purples",
+            xticklabels=corr.columns.values,
+            yticklabels=corr.columns.values)
+sns.set_style("ticks", {"font.size": 12,
+                        "font.family": "Arial",
+                        "xtick.major.size": 4,
+                        "ytick.major.size": 4}
+              )
+sns.set(font_scale=2)
+sns.set_context("poster")
+plt.show()
+
